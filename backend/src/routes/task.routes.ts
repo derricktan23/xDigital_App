@@ -13,5 +13,6 @@ router.get('/', taskController.getAllTasks);
 router.get('/:id', taskController.getTaskById);
 router.patch('/:id/assign', taskController.assignDeveloper);
 router.patch('/:id/status', taskController.updateStatus);
+router.patch('/:id/skills', taskController.updateTaskSkills);
 
 export default router;

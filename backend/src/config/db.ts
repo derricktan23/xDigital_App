@@ -23,6 +23,17 @@ export const pool = connectionString
       database: process.env.POSTGRES_DB,
     });
 
+export const initDbSchema = async (): Promise<void> => {
+  try {
+    await pool.query(`
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id INT REFERENCES tasks(id) ON DELETE CASCADE;
+      CREATE INDEX IF NOT EXISTS idx_tasks_parent_task_id ON tasks(parent_task_id);
+    `);
+  } catch (err: any) {
+    logger.debug('Schema migration check skipped or failed:', err.message);
+  }
+};
+
 pool.on('error', (err) => {
   logger.error('Unexpected error on idle PostgreSQL client pool', err.message);
 });
