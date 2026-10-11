@@ -1,7 +1,3 @@
-/**
- * Application entry point.
- * Loads environment variables and starts the Express HTTP server.
- */
 import app from './app';
 import dotenv from 'dotenv';
 import path from 'path';

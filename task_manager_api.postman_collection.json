@@ -204,6 +204,36 @@
           "response": []
         },
         {
+          "name": "Unassign Developer from Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"developer_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", ":id", "assign"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Task ID"
+                }
+              ]
+            },
+            "description": "Unassign any developer currently assigned to the task by passing developer_id: null."
+          },
+          "response": []
+        },
+        {
           "name": "Assign Developer - Lacks Skills (Expect 400)",
           "request": {
             "method": "PATCH",

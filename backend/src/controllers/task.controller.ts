@@ -44,14 +44,19 @@ export class TaskController {
   assignDeveloper = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const taskId = parseInt(req.params.id, 10);
-      const developerId = parseInt(req.body.developer_id, 10);
-
       if (isNaN(taskId)) {
         res.status(400).json({ error: 'Invalid task ID' });
         return;
       }
-      if (isNaN(developerId)) {
-        res.status(400).json({ error: 'Invalid or missing developer_id' });
+
+      const rawDevId = req.body.developer_id;
+      const developerId =
+        rawDevId === null || rawDevId === '' || rawDevId === undefined
+          ? null
+          : parseInt(rawDevId, 10);
+
+      if (developerId !== null && isNaN(developerId)) {
+        res.status(400).json({ error: 'Invalid developer ID' });
         return;
       }
 

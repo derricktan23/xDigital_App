@@ -85,7 +85,7 @@ export class TaskRepository {
     return result.rows;
   }
 
-  async assignDeveloper(taskId: number, developerId: number): Promise<Task> {
+  async assignDeveloper(taskId: number, developerId: number | null): Promise<Task> {
     const query = 'UPDATE tasks SET assigned_developer_id = $1 WHERE id = $2 RETURNING id, title, status, assigned_developer_id';
     const result = await this.pool.query(query, [developerId, taskId]);
     return result.rows[0];

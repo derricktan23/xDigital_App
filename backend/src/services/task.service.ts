@@ -45,10 +45,19 @@ export class TaskService {
     return this.taskRepository.findAllWithDetails();
   }
 
-  async assignDeveloperToTask(taskId: number, developerId: number): Promise<TaskWithDetails> {
+  async assignDeveloperToTask(taskId: number, developerId: number | null): Promise<TaskWithDetails> {
     const task = await this.taskRepository.findById(taskId);
     if (!task) {
       throw new CustomError('Task not found', 404);
+    }
+
+    if (developerId === null) {
+      await this.taskRepository.assignDeveloper(taskId, null);
+      const updatedTask = await this.taskRepository.findWithSkillsById(taskId);
+      if (!updatedTask) {
+        throw new CustomError('Failed to fetch updated task', 500);
+      }
+      return updatedTask;
     }
 
     const developer = await this.developerRepository.findById(developerId);
