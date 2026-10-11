@@ -113,6 +113,22 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleRequestSkillsChange = async (task: Task, newSkillIds: number[]) => {
+    try {
+      setUpdatingTaskId(task.id);
+      const updatedTask = await api.updateTaskSkills(task.id, newSkillIds);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? updatedTask : t))
+      );
+      showSnackbar(`Skills updated for "${task.title}" successfully!`, 'success');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || 'Failed to update skills';
+      showSnackbar(errMsg, 'error');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
   const handleExecutePendingAction = async () => {
     if (!pendingAction) return;
 
@@ -185,10 +201,12 @@ export const App: React.FC = () => {
             <TaskTable
               tasks={tasks}
               developers={developers}
+              availableSkills={skills}
               loading={loading}
               updatingTaskId={updatingTaskId}
               onRequestStatusChange={handleRequestStatusChange}
               onRequestAssigneeChange={handleRequestAssigneeChange}
+              onRequestSkillsChange={handleRequestSkillsChange}
             />
           </Paper>
         </Container>

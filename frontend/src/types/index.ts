@@ -18,11 +18,14 @@ export interface Task {
   assigned_developer_id: number | null;
   assigned_developer?: { id: number; name: string } | null;
   skills: Skill[];
+  parent_task_id?: number | null;
 }
 
 export interface CreateTaskPayload {
   title: string;
   status?: TaskStatus;
   task_skills?: number[];
+  parent_task_id?: number | null;
+  subtasks?: CreateTaskPayload[];
 }
 
