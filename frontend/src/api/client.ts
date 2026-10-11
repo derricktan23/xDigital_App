@@ -42,3 +42,8 @@ export const updateTaskStatus = async (taskId: number, status: TaskStatus): Prom
   const response = await api.patch<Task>(`/tasks/${taskId}/status`, { status });
   return response.data;
 };
+
+export const updateTaskSkills = async (taskId: number, skillIds: number[]): Promise<Task> => {
+  const response = await api.patch<Task>(`/tasks/${taskId}/skills`, { skill_ids: skillIds });
+  return response.data;
+};

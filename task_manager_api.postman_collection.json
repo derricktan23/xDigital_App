@@ -23,8 +23,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Check if the backend server is up and responsive."
           },
@@ -42,8 +46,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/skills",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "skills"
+              ]
             },
             "description": "Fetch all available skills (e.g. Frontend, Backend)."
           },
@@ -56,8 +64,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/skills/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills", ":id"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "skills",
+                ":id"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -82,8 +95,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/developers",
-              "host": ["{{baseUrl}}"],
-              "path": ["developers"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "developers"
+              ]
             },
             "description": "Fetch all developers along with their acquired skills."
           },
@@ -96,8 +113,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/developers/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["developers", ":id"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "developers",
+                ":id"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -122,8 +144,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
             },
             "description": "Fetch all tasks including required skills and assigned developer."
           },
@@ -136,8 +162,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/tasks/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -166,10 +197,41 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
             },
             "description": "Create a new task with required skill IDs (e.g. 1 = Frontend, 2 = Backend)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Task with Nested Subtasks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Epic Feature 1\",\n  \"status\": \"To-do\",\n  \"task_skills\": [1],\n  \"subtasks\": [\n    {\n      \"title\": \"Subtask 1.1\",\n      \"status\": \"To-do\",\n      \"task_skills\": [2],\n      \"subtasks\": [\n        {\n          \"title\": \"Subtask 1.1.1\",\n          \"status\": \"To-do\",\n          \"task_skills\": [1, 2]\n        },\n        {\n          \"title\": \"Subtask 1.1.2\",\n          \"status\": \"To-do\",\n          \"task_skills\": [2]\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            },
+            "description": "Create a task along with nested subtasks in a single payload."
           },
           "response": []
         },
@@ -189,8 +251,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/assign",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "assign"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "assign"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -219,8 +287,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/assign",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "assign"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "assign"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -249,8 +323,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/status",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "status"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "status"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -260,6 +340,42 @@
               ]
             },
             "description": "Update task status (e.g., 'To-do', 'In Progress', 'Done')."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task / Subtask Skills",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skill_ids\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/skills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "skills"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "4",
+                  "description": "Task or Subtask ID"
+                }
+              ]
+            },
+            "description": "Add, remove, or modify required skills for a task or subtask."
           },
           "response": []
         }

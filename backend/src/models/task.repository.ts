@@ -13,9 +13,9 @@ export class TaskRepository {
     this.pool = poolInstance;
   }
 
-  async create(title: string, status: string = 'To-do'): Promise<Task> {
-    const query = 'INSERT INTO tasks (title, status) VALUES ($1, $2) RETURNING id, title, status, assigned_developer_id';
-    const result = await this.pool.query(query, [title, status]);
+  async create(title: string, status: string = 'To-do', parentTaskId: number | null = null): Promise<Task> {
+    const query = 'INSERT INTO tasks (title, status, parent_task_id) VALUES ($1, $2, $3) RETURNING id, title, status, assigned_developer_id, parent_task_id';
+    const result = await this.pool.query(query, [title, status, parentTaskId]);
     return result.rows[0];
   }
 
@@ -32,15 +32,29 @@ export class TaskRepository {
     await this.pool.query(query, [taskId, ...uniqueSkills]);
   }
 
+  async setTaskSkills(taskId: number, skillIds: number[]): Promise<void> {
+    await this.pool.query('DELETE FROM task_skills WHERE task_id = $1', [taskId]);
+
+    if (skillIds && skillIds.length > 0) {
+      const uniqueSkills = Array.from(new Set(skillIds));
+      const valuePlaceholders = uniqueSkills
+        .map((_, index) => `($1, $${index + 2})`)
+        .join(', ');
+
+      const query = `INSERT INTO task_skills (task_id, skill_id) VALUES ${valuePlaceholders} ON CONFLICT DO NOTHING`;
+      await this.pool.query(query, [taskId, ...uniqueSkills]);
+    }
+  }
+
   async findById(id: number): Promise<Task | null> {
-    const query = 'SELECT id, title, status, assigned_developer_id FROM tasks WHERE id = $1';
+    const query = 'SELECT id, title, status, assigned_developer_id, parent_task_id FROM tasks WHERE id = $1';
     const result = await this.pool.query(query, [id]);
     return result.rows[0] || null;
   }
 
   async findWithSkillsById(id: number): Promise<TaskWithDetails | null> {
     const taskQuery = `
-      SELECT t.id, t.title, t.status, t.assigned_developer_id, d.name as developer_name
+      SELECT t.id, t.title, t.status, t.assigned_developer_id, t.parent_task_id, d.name as developer_name
       FROM tasks t
       LEFT JOIN developers d ON t.assigned_developer_id = d.id
       WHERE t.id = $1
@@ -66,6 +80,7 @@ export class TaskRepository {
       title: row.title,
       status: row.status,
       assigned_developer_id: row.assigned_developer_id,
+      parent_task_id: row.parent_task_id,
       assigned_developer: row.assigned_developer_id
         ? { id: row.assigned_developer_id, name: row.developer_name }
         : null,
@@ -85,16 +100,35 @@ export class TaskRepository {
     return result.rows;
   }
 
-  async assignDeveloper(taskId: number, developerId: number): Promise<Task> {
-    const query = 'UPDATE tasks SET assigned_developer_id = $1 WHERE id = $2 RETURNING id, title, status, assigned_developer_id';
+  async assignDeveloper(taskId: number, developerId: number | null): Promise<Task> {
+    const query = 'UPDATE tasks SET assigned_developer_id = $1 WHERE id = $2 RETURNING id, title, status, assigned_developer_id, parent_task_id';
     const result = await this.pool.query(query, [developerId, taskId]);
     return result.rows[0];
   }
 
   async updateStatus(taskId: number, status: string): Promise<Task> {
-    const query = 'UPDATE tasks SET status = $1 WHERE id = $2 RETURNING id, title, status, assigned_developer_id';
+    const query = 'UPDATE tasks SET status = $1 WHERE id = $2 RETURNING id, title, status, assigned_developer_id, parent_task_id';
     const result = await this.pool.query(query, [status, taskId]);
     return result.rows[0];
+  }
+
+  async getIncompleteSubtasks(taskId: number): Promise<Task[]> {
+    const query = `
+      WITH RECURSIVE subtask_tree AS (
+        SELECT id, title, status, parent_task_id
+        FROM tasks
+        WHERE parent_task_id = $1
+        UNION ALL
+        SELECT t.id, t.title, t.status, t.parent_task_id
+        FROM tasks t
+        INNER JOIN subtask_tree st ON t.parent_task_id = st.id
+      )
+      SELECT id, title, status, parent_task_id
+      FROM subtask_tree
+      WHERE status != 'Done'
+    `;
+    const result = await this.pool.query(query, [taskId]);
+    return result.rows;
   }
 
   async findAllWithDetails(): Promise<TaskWithDetails[]> {
@@ -104,6 +138,7 @@ export class TaskRepository {
         t.title,
         t.status,
         t.assigned_developer_id,
+        t.parent_task_id,
         d.name as developer_name,
         s.id as skill_id,
         s.name as skill_name
@@ -124,6 +159,7 @@ export class TaskRepository {
           title: row.title,
           status: row.status,
           assigned_developer_id: row.assigned_developer_id,
+          parent_task_id: row.parent_task_id,
           assigned_developer: row.assigned_developer_id
             ? { id: row.assigned_developer_id, name: row.developer_name }
             : null,

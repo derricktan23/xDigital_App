@@ -23,17 +23,21 @@ export interface Task {
   title: string;
   status: TaskStatus | string;
   assigned_developer_id: number | null;
+  parent_task_id?: number | null;
 }
 
 export interface TaskWithDetails extends Task {
   skills: Skill[];
   assigned_developer?: Developer | null;
+  subtasks?: TaskWithDetails[];
 }
 
 export interface CreateTaskDTO {
   title: string;
   status?: string;
   task_skills?: number[]; // array of skill IDs
+  parent_task_id?: number | null;
+  subtasks?: CreateTaskDTO[];
 }
 
 export interface AssignTaskDTO {
@@ -42,6 +46,10 @@ export interface AssignTaskDTO {
 
 export interface UpdateStatusDTO {
   status: string;
+}
+
+export interface UpdateTaskSkillsDTO {
+  skill_ids: number[];
 }
 
 export class CustomError extends Error {

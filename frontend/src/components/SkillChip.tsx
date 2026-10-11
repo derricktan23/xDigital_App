@@ -18,7 +18,19 @@ export const SkillChip: React.FC<SkillChipProps> = ({ name, onDelete }) => {
     <Chip
       label={name}
       size="small"
-      onDelete={onDelete}
+      onDelete={
+        onDelete
+          ? (e) => {
+              e.stopPropagation();
+              onDelete(e);
+            }
+          : undefined
+      }
+      onMouseDown={(e) => {
+        if (onDelete) {
+          e.stopPropagation();
+        }
+      }}
       sx={{
         bgcolor: bgColor,
         color: textColor,
