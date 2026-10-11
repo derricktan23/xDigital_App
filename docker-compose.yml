@@ -30,7 +30,16 @@ services:
       PORT: 5001
     depends_on:
       - db
-      
+
+  frontend:
+    build: ./frontend
+    container_name: task_frontend_spa
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
   adminer:
     image: adminer
     container_name: task_adminer
