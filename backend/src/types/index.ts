@@ -16,10 +16,12 @@ export interface DeveloperWithSkills extends Developer {
   skills: Skill[];
 }
 
+export type TaskStatus = 'To-do' | 'In Progress' | 'Done';
+
 export interface Task {
   id: number;
   title: string;
-  status: string;
+  status: TaskStatus | string;
   assigned_developer_id: number | null;
 }
 
