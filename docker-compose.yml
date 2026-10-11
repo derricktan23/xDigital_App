@@ -13,8 +13,24 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  backend:
+    build: ./backend
+    container_name: task_backend_api
+    restart: always
+    ports:
+      - "${PORT:-5001}:5001"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PORT: 5001
+    depends_on:
+      - db
+      
   adminer:
     image: adminer
     container_name: task_adminer
