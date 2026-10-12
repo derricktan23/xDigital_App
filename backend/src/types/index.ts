@@ -26,10 +26,18 @@ export interface Task {
   parent_task_id?: number | null;
 }
 
+export interface AIRecommendationResult {
+  attempted: boolean;
+  success: boolean;
+  identifiedSkills?: string[];
+  error?: string;
+}
+
 export interface TaskWithDetails extends Task {
   skills: Skill[];
   assigned_developer?: Developer | null;
   subtasks?: TaskWithDetails[];
+  ai_recommendation?: AIRecommendationResult;
 }
 
 export interface CreateTaskDTO {

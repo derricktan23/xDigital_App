@@ -39,6 +39,10 @@ export const App: React.FC = () => {
   // Updating row loading state
   const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
 
+  // Frontend AI Recommendation State (stored in frontend, not in DB)
+  const [aiRecommendations, setAiRecommendations] = useState<Record<number, Skill[]>>({});
+  const [analyzingTaskIds, setAnalyzingTaskIds] = useState<Set<number>>(new Set());
+
   // Modal Dialog States
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -55,6 +59,35 @@ export const App: React.FC = () => {
     severity: 'info',
   });
 
+  const autoFetchRecommendationsForMissing = async (taskList: Task[]) => {
+    const missingTasks = taskList.filter((t) => !t.skills || t.skills.length === 0);
+    if (missingTasks.length === 0) return;
+
+    setAnalyzingTaskIds((prev) => new Set([...prev, ...missingTasks.map((t) => t.id)]));
+
+    await Promise.all(
+      missingTasks.map(async (task) => {
+        try {
+          const res = await api.recommendTaskSkills(task.id);
+          if (res && res.skills && res.skills.length > 0) {
+            setAiRecommendations((prev) => ({
+              ...prev,
+              [task.id]: res.skills,
+            }));
+          }
+        } catch (err) {
+          console.warn(`[AI Recommendation] Suggestion skipped for task ${task.id}:`, err);
+        } finally {
+          setAnalyzingTaskIds((prev) => {
+            const next = new Set(prev);
+            next.delete(task.id);
+            return next;
+          });
+        }
+      })
+    );
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -66,6 +99,9 @@ export const App: React.FC = () => {
       setTasks(fetchedTasks);
       setDevelopers(fetchedDevs);
       setSkills(fetchedSkills);
+
+      // Automatically generate AI skill recommendations for all tasks & subtasks without user-specified skills
+      autoFetchRecommendationsForMissing(fetchedTasks);
     } catch (err: any) {
       showSnackbar(err.response?.data?.error || 'Failed to connect to backend server', 'error');
     } finally {
@@ -91,6 +127,41 @@ export const App: React.FC = () => {
       showSnackbar(errMsg, 'error');
       throw err;
     }
+  };
+
+
+  const handleApplyRecommendation = async (taskId: number, skillsToApply: Skill[]) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    try {
+      setUpdatingTaskId(taskId);
+      const skillIds = skillsToApply.map((s) => s.id);
+      const updatedTask = await api.updateTaskSkills(taskId, skillIds);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+
+      // Remove from frontend recommendations once applied
+      setAiRecommendations((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+
+      showSnackbar(`Applied ${skillsToApply.map((s) => s.name).join(', ')} to "${task.title}"!`, 'success');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || 'Failed to apply recommendation';
+      showSnackbar(errMsg, 'error');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const handleDismissRecommendation = (taskId: number) => {
+    setAiRecommendations((prev) => {
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
+    });
   };
 
   const handleRequestStatusChange = (task: Task, newStatus: TaskStatus) => {
@@ -159,7 +230,6 @@ export const App: React.FC = () => {
 
       setPendingAction(null);
     } catch (err: any) {
-      // Catch backend 400 skill validation error or server error and display red alert toast
       const errMsg = err.response?.data?.error || 'Operation failed';
       showSnackbar(errMsg, 'error');
       setPendingAction(null);
@@ -204,9 +274,13 @@ export const App: React.FC = () => {
               availableSkills={skills}
               loading={loading}
               updatingTaskId={updatingTaskId}
+              analyzingTaskIds={analyzingTaskIds}
+              aiRecommendations={aiRecommendations}
               onRequestStatusChange={handleRequestStatusChange}
               onRequestAssigneeChange={handleRequestAssigneeChange}
               onRequestSkillsChange={handleRequestSkillsChange}
+              onApplyRecommendation={handleApplyRecommendation}
+              onDismissRecommendation={handleDismissRecommendation}
             />
           </Paper>
         </Container>

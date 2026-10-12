@@ -47,3 +47,28 @@ export const updateTaskSkills = async (taskId: number, skillIds: number[]): Prom
   const response = await api.patch<Task>(`/tasks/${taskId}/skills`, { skill_ids: skillIds });
   return response.data;
 };
+
+export interface TaskRecommendationResponse {
+  taskId: number;
+  identifiedSkills: string[];
+  skills: Skill[];
+}
+
+export const recommendTaskSkills = async (taskId: number): Promise<TaskRecommendationResponse> => {
+  const response = await api.post<TaskRecommendationResponse>(`/tasks/${taskId}/recommend-skills`);
+  return response.data;
+};
+
+export const checkLlmStatus = async (): Promise<{ success: boolean; model: string; message: string; details?: any }> => {
+  try {
+    const response = await api.get('/llm/status');
+    return response.data;
+  } catch (err: any) {
+    return {
+      success: false,
+      model: 'gemini-1.5-flash',
+      message: err.response?.data?.message || err.message || 'Failed to reach backend /llm/status',
+      details: err.response?.data?.details,
+    };
+  }
+};

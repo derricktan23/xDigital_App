@@ -12,8 +12,9 @@ export class TaskService {
   constructor(
     private taskRepository: TaskRepository = new TaskRepository(),
     private developerRepository: DeveloperRepository = new DeveloperRepository(),
-    private skillRepository: SkillRepository = new SkillRepository()
-  ) { }
+    private skillRepository: SkillRepository = new SkillRepository(),
+    private llmService: LLMService = new LLMService()
+  ) {}
 
   async createTask(dto: CreateTaskDTO, parentTaskId: number | null = null): Promise<TaskWithDetails> {
     if (!dto.title || dto.title.trim() === '') {
@@ -24,6 +25,7 @@ export class TaskService {
     const parentId = dto.parent_task_id ?? parentTaskId;
     const task = await this.taskRepository.create(dto.title, status, parentId);
 
+    // If user provided task_skills, attach them directly.
     if (dto.task_skills && dto.task_skills.length > 0) {
       await this.taskRepository.addTaskSkills(task.id, dto.task_skills);
     }
@@ -152,5 +154,22 @@ export class TaskService {
     }
 
     return updatedTask;
+  }
+
+  async recommendSkillsForTask(taskId: number): Promise<{ taskId: number; identifiedSkills: string[]; skills: Skill[] }> {
+    const task = await this.taskRepository.findById(taskId);
+    if (!task) {
+      throw new CustomError('Task not found', 404);
+    }
+
+    const allSkills = await this.skillRepository.findAll();
+    const rec = await this.llmService.identifySkillsDetail(task.title, allSkills);
+    const recommendedSkills = allSkills.filter((s) => rec.skillIds.includes(s.id));
+
+    return {
+      taskId: task.id,
+      identifiedSkills: rec.identifiedNames,
+      skills: recommendedSkills,
+    };
   }
 }

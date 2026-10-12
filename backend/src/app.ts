@@ -7,6 +7,7 @@ import cors from 'cors';
 import taskRoutes from './routes/task.routes';
 import developerRoutes from './routes/developer.routes';
 import skillRoutes from './routes/skill.routes';
+import llmRoutes from './routes/llm.routes';
 import { errorHandler } from './middlewares/errorHandler';
 import { requestLogger } from './middlewares/requestLogger';
 
@@ -20,6 +21,7 @@ app.use(requestLogger);
 app.use('/tasks', taskRoutes);
 app.use('/developers', developerRoutes);
 app.use('/skills', skillRoutes);
+app.use('/llm', llmRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
