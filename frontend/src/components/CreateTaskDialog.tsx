@@ -5,22 +5,15 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  OutlinedInput,
   Box,
   Typography,
   IconButton,
   CircularProgress,
-  Checkbox,
-  ListItemText,
+  Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Skill, CreateTaskPayload } from '../types';
-import { SkillChip } from './SkillChip';
+import { TaskNodeItem, TaskFormNode } from './TaskNodeItem';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -29,45 +22,131 @@ interface CreateTaskDialogProps {
   onSubmit: (payload: CreateTaskPayload) => Promise<void>;
 }
 
+const createInitialRootNode = (): TaskFormNode => ({
+  id: 'root-task',
+  isRoot: true,
+  title: '',
+  task_skills: [],
+  subtasks: [],
+});
+
+function addSubtaskToTree(node: TaskFormNode, targetParentId: string): TaskFormNode {
+  if (node.id === targetParentId) {
+    const newNode: TaskFormNode = {
+      id: `subtask-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      isRoot: false,
+      title: '',
+      task_skills: [],
+      subtasks: [],
+    };
+    return {
+      ...node,
+      subtasks: [...node.subtasks, newNode],
+    };
+  }
+  return {
+    ...node,
+    subtasks: node.subtasks.map((child) => addSubtaskToTree(child, targetParentId)),
+  };
+}
+
+function removeSubtaskFromTree(node: TaskFormNode, targetId: string): TaskFormNode {
+  return {
+    ...node,
+    subtasks: node.subtasks
+      .filter((child) => child.id !== targetId)
+      .map((child) => removeSubtaskFromTree(child, targetId)),
+  };
+}
+
+function updateNodeTitleInTree(node: TaskFormNode, targetId: string, title: string): TaskFormNode {
+  if (node.id === targetId) {
+    return { ...node, title };
+  }
+  return {
+    ...node,
+    subtasks: node.subtasks.map((child) => updateNodeTitleInTree(child, targetId, title)),
+  };
+}
+
+function updateNodeSkillsInTree(node: TaskFormNode, targetId: string, skills: number[]): TaskFormNode {
+  if (node.id === targetId) {
+    return { ...node, task_skills: skills };
+  }
+  return {
+    ...node,
+    subtasks: node.subtasks.map((child) => updateNodeSkillsInTree(child, targetId, skills)),
+  };
+}
+
+function validateTree(node: TaskFormNode): string | null {
+  if (!node.title.trim()) {
+    return node.isRoot ? 'Task title is required' : 'Subtask title is required';
+  }
+  for (const child of node.subtasks) {
+    const err = validateTree(child);
+    if (err) return err;
+  }
+  return null;
+}
+
+function treeToPayload(node: TaskFormNode): CreateTaskPayload {
+  return {
+    title: node.title.trim(),
+    status: 'To-do',
+    task_skills: node.task_skills,
+    subtasks: node.subtasks.map(treeToPayload),
+  };
+}
+
 export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onClose,
   availableSkills,
   onSubmit,
 }) => {
-  const [title, setTitle] = useState('');
-  const [selectedSkillIds, setSelectedSkillIds] = useState<number[]>([]);
+  const [rootNode, setRootNode] = useState<TaskFormNode>(createInitialRootNode);
   const [loading, setLoading] = useState(false);
-  const [titleError, setTitleError] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleClose = () => {
-    setTitle('');
-    setSelectedSkillIds([]);
-    setTitleError('');
+    setRootNode(createInitialRootNode());
+    setErrorMessage('');
     onClose();
   };
 
-  const handleRemoveSkill = (skillIdToRemove: number) => {
-    setSelectedSkillIds((prev) => prev.filter((id) => id !== skillIdToRemove));
+  const handleUpdateTitle = (nodeId: string, title: string) => {
+    setRootNode((prev) => updateNodeTitleInTree(prev, nodeId, title));
+    if (errorMessage) setErrorMessage('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleUpdateSkills = (nodeId: string, skills: number[]) => {
+    setRootNode((prev) => updateNodeSkillsInTree(prev, nodeId, skills));
+  };
+
+  const handleAddSubtask = (parentId: string) => {
+    setRootNode((prev) => addSubtaskToTree(prev, parentId));
+  };
+
+  const handleRemoveSubtask = (nodeId: string) => {
+    setRootNode((prev) => removeSubtaskFromTree(prev, nodeId));
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      setTitleError('Task title is required');
+    const validationError = validateTree(rootNode);
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
     try {
       setLoading(true);
-      await onSubmit({
-        title: title.trim(),
-        status: 'To-do',
-        task_skills: selectedSkillIds,
-      });
+      const payload = treeToPayload(rootNode);
+      await onSubmit(payload);
       handleClose();
     } catch (err) {
-      // Error handled by parent notification
+      // Error is caught and surfaced in App notification toast
     } finally {
       setLoading(false);
     }
@@ -78,115 +157,65 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       open={open}
       onClose={handleClose}
       fullWidth
-      maxWidth="sm"
+      maxWidth="md"
       PaperProps={{
         sx: {
           borderRadius: 3,
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
         },
       }}
     >
-      <DialogTitle sx={{ m: 0, p: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <DialogTitle
+        sx={{
+          m: 0,
+          p: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #f1f5f9',
+        }}
+      >
         <Typography variant="h6" fontWeight={700} color="#0f172a">
-          Create New Task
+          Create Task(s)
         </Typography>
         <IconButton onClick={handleClose} size="small" sx={{ color: '#64748b' }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
-      <form onSubmit={handleSubmit}>
-        <DialogContent dividers sx={{ p: 3 }}>
-          <Box display="flex" flexDirection="column" gap={3}>
-            <TextField
-              label="Task Title"
-              placeholder="e.g. As a visitor, I want a responsive homepage"
-              multiline
-              rows={3}
-              fullWidth
-              variant="outlined"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (e.target.value) setTitleError('');
-              }}
-              error={Boolean(titleError)}
-              helperText={titleError}
-              autoFocus
+      <form onSubmit={handleSave}>
+        <DialogContent sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+
+          <Box>
+            <TaskNodeItem
+              node={rootNode}
+              availableSkills={availableSkills}
+              onUpdateTitle={handleUpdateTitle}
+              onUpdateSkills={handleUpdateSkills}
+              onAddSubtask={handleAddSubtask}
+              onRemoveSubtask={handleRemoveSubtask}
             />
-
-            <FormControl fullWidth variant="outlined">
-              <InputLabel id="skills-select-label">Required Skill(s)</InputLabel>
-              <Select
-                labelId="skills-select-label"
-                multiple
-                value={selectedSkillIds}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedSkillIds(typeof val === 'string' ? val.split(',').map(Number) : val);
-                }}
-                input={<OutlinedInput label="Required Skill(s)" />}
-                renderValue={(selected) => (
-                  <Box display="flex" flexWrap="wrap" gap={0.5}>
-                    {selected.map((skillId) => {
-                      const skill = availableSkills.find((s) => s.id === skillId);
-                      if (!skill) return null;
-                      return (
-                        <Box
-                          key={skill.id}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          display="inline-block"
-                        >
-                          <SkillChip
-                            name={skill.name}
-                            onDelete={() => handleRemoveSkill(skill.id)}
-                          />
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                )}
-              >
-                {availableSkills.map((skill) => (
-                  <MenuItem key={skill.id} value={skill.id}>
-                    <Checkbox checked={selectedSkillIds.includes(skill.id)} size="small" />
-                    <ListItemText primary={skill.name} />
-                  </MenuItem>
-                ))}
-              </Select>
-
-              {/* Selected skills quick-deselect badges section */}
-              {selectedSkillIds.length > 0 && (
-                <Box mt={1.5}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                    Selected Skills (Click 'X' to remove):
-                  </Typography>
-                  <Box display="flex" flexWrap="wrap" gap={0.5}>
-                    {selectedSkillIds.map((skillId) => {
-                      const skill = availableSkills.find((s) => s.id === skillId);
-                      if (!skill) return null;
-                      return (
-                        <SkillChip
-                          key={skill.id}
-                          name={skill.name}
-                          onDelete={() => handleRemoveSkill(skill.id)}
-                        />
-                      );
-                    })}
-                  </Box>
-                </Box>
-              )}
-
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 0.5 }}>
-                Developers do not need to be assigned at task creation.
-              </Typography>
-            </FormControl>
           </Box>
         </DialogContent>
 
-        <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc' }}>
-          <Button onClick={handleClose} disabled={loading} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>
+        <DialogActions
+          sx={{
+            p: 2.5,
+            bgcolor: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <Button
+            onClick={handleClose}
+            disabled={loading}
+            sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, mr: 1 }}
+          >
             Cancel
           </Button>
           <Button
@@ -199,15 +228,15 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               color: '#ffffff',
               fontWeight: 600,
               textTransform: 'none',
-              px: 3,
-              py: 1,
+              px: 3.5,
+              py: 0.9,
               borderRadius: 2,
               '&:hover': {
                 bgcolor: '#1d4ed8',
               },
             }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Task'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save'}
           </Button>
         </DialogActions>
       </form>

@@ -10,8 +10,14 @@ export class TaskController {
 
   createTask = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { title, status, task_skills } = req.body;
-      const task = await this.taskService.createTask({ title, status, task_skills });
+      const { title, status, task_skills, parent_task_id, subtasks } = req.body;
+      const task = await this.taskService.createTask({
+        title,
+        status,
+        task_skills,
+        parent_task_id,
+        subtasks,
+      });
       res.status(201).json(task);
     } catch (error) {
       next(error);
@@ -74,6 +80,41 @@ export class TaskController {
 
       const updatedTask = await this.taskService.updateTaskStatus(taskId, status);
       res.status(200).json(updatedTask);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateTaskSkills = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const { skill_ids } = req.body;
+
+      if (isNaN(taskId)) {
+        res.status(400).json({ error: 'Invalid task ID' });
+        return;
+      }
+      if (!Array.isArray(skill_ids)) {
+        res.status(400).json({ error: 'skill_ids must be an array of skill IDs' });
+        return;
+      }
+
+      const updatedTask = await this.taskService.updateTaskSkills(taskId, skill_ids);
+      res.status(200).json(updatedTask);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  recommendSkillsForTask = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      if (isNaN(taskId)) {
+        res.status(400).json({ error: 'Invalid task ID' });
+        return;
+      }
+      const result = await this.taskService.recommendSkillsForTask(taskId);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

@@ -11,6 +11,13 @@ export interface Developer {
   skills: Skill[];
 }
 
+export interface AIRecommendationResult {
+  attempted: boolean;
+  success: boolean;
+  identifiedSkills?: string[];
+  error?: string;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -18,11 +25,15 @@ export interface Task {
   assigned_developer_id: number | null;
   assigned_developer?: { id: number; name: string } | null;
   skills: Skill[];
+  parent_task_id?: number | null;
+  ai_recommendation?: AIRecommendationResult;
 }
 
 export interface CreateTaskPayload {
   title: string;
   status?: TaskStatus;
   task_skills?: number[];
+  parent_task_id?: number | null;
+  subtasks?: CreateTaskPayload[];
 }
 
