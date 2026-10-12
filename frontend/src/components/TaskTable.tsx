@@ -697,28 +697,41 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               </MenuItem>
                               {developers.map((dev) => {
                                 const devSkillIds = dev.skills.map((s) => s.id);
-                                const hasAllSkills = hasTaskSkills && taskSkillIds.every((skId) => devSkillIds.includes(skId));
+                                const missingSkills = task.skills.filter((sk) => !devSkillIds.includes(sk.id));
+                                const hasAllSkills = hasTaskSkills && missingSkills.length === 0;
+
+                                const tooltipTitle = !hasTaskSkills
+                                  ? `Please assign skills to this ${isSubtask ? 'subtask' : 'task'} first`
+                                  : `Missing: ${missingSkills.map((s) => s.name).join(', ')}`;
 
                                 return (
                                   <MenuItem
                                     key={dev.id}
                                     value={dev.id}
                                     disabled={!hasTaskSkills || !hasAllSkills}
+                                    sx={{
+                                      '&.Mui-disabled': {
+                                        pointerEvents: 'auto',
+                                        cursor: 'not-allowed',
+                                        opacity: 0.65,
+                                      },
+                                    }}
                                   >
-                                    <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                                      <Typography variant="body2" fontWeight={hasAllSkills ? 600 : 400}>
-                                        {dev.name}
-                                      </Typography>
-                                      {!hasTaskSkills ? (
-                                        <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic', ml: 1 }}>
-                                          No skills defined
+                                    <Tooltip
+                                      title={tooltipTitle}
+                                      placement="right"
+                                      arrow
+                                      disableHoverListener={hasAllSkills}
+                                    >
+                                      <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                                        <Typography variant="body2" fontWeight={hasAllSkills ? 600 : 400}>
+                                          {dev.name}
                                         </Typography>
-                                      ) : !hasAllSkills ? (
-                                        <Tooltip title="Cannot select: developer lacks required skills">
-                                          <WarningAmberIcon fontSize="small" color="warning" sx={{ ml: 1 }} />
-                                        </Tooltip>
-                                      ) : null}
-                                    </Box>
+                                        {!hasTaskSkills ? null : !hasAllSkills ? (
+                                          <WarningAmberIcon sx={{ fontSize: 17, color: '#f59e0b', ml: 1 }} />
+                                        ) : null}
+                                      </Box>
+                                    </Tooltip>
                                   </MenuItem>
                                 );
                               })}
