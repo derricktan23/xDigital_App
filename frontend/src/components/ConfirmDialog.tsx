@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         },
       }}
     >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+      <DialogTitle component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
         <Box
           sx={{
             bgcolor: headerBgColor,
@@ -71,7 +71,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         >
           <HelpOutlineIcon fontSize="medium" />
         </Box>
-        <Typography variant="h6" fontWeight={700} color="#0f172a">
+        <Typography component="span" variant="h6" fontWeight={700} color="#0f172a">
           {isStatus
             ? 'Confirm Status Change'
             : isUnassign

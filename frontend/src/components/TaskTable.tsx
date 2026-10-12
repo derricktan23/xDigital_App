@@ -444,10 +444,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           onChange={(e) => {
                             const val = e.target.value;
                             const rawList = typeof val === 'string' ? val.split(',') : (val as (number | string)[]);
-                            if (rawList.includes('__AI_RECOMMEND__')) {
-                              onRequestAiRecommend?.(task);
-                              return;
-                            }
                             const newSkillIds = rawList
                               .map(Number)
                               .filter((id) => !isNaN(id));
@@ -629,78 +625,109 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                 {/* 5. Assignee Dropdown Column */}
                 <TableCell sx={{ verticalAlign: isSubtask ? 'top' : 'middle', pt: isSubtask ? 2 : 2 }}>
-                  <FormControl size="small" fullWidth disabled={isRowUpdating}>
-                    <Select
-                      displayEmpty
-                      value={task.assigned_developer_id ?? ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          if (task.assigned_developer_id !== null) {
-                            onRequestAssigneeChange(task, null, 'Unassigned');
-                          }
-                        } else {
-                          const devId = Number(val);
-                          if (devId && devId !== task.assigned_developer_id) {
-                            const targetDev = developers.find((d) => d.id === devId);
-                            const devName = targetDev ? targetDev.name : `Developer #${devId}`;
-                            onRequestAssigneeChange(task, devId, devName);
-                          }
-                        }
-                      }}
-                      renderValue={(selected) => {
-                        if (!selected) {
-                          return (
-                            <Box display="flex" alignItems="center" gap={1} color="#94a3b8">
-                              <PersonOutlineIcon fontSize="small" />
-                              <em>Unassigned</em>
-                            </Box>
-                          );
-                        }
-                        const dev = developers.find((d) => d.id === Number(selected));
-                        return (
-                          <Box display="flex" alignItems="center" gap={1} fontWeight={600} color="#0f172a">
-                            <PersonOutlineIcon fontSize="small" color="primary" />
-                            {dev ? dev.name : task.assigned_developer?.name || `Dev #${selected}`}
-                          </Box>
-                        );
-                      }}
-                      sx={{
-                        borderRadius: 2,
-                        fontSize: '0.875rem',
-                        bgcolor: '#ffffff',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#cbd5e1',
-                        },
-                      }}
-                    >
-                      <MenuItem value="">
-                        <Box display="flex" alignItems="center" gap={1} color="#64748b">
-                          <PersonOutlineIcon fontSize="small" />
-                          <em>Unassigned</em>
-                        </Box>
-                      </MenuItem>
-                      {developers.map((dev) => {
-                        const devSkillIds = dev.skills.map((s) => s.id);
-                        const hasAllSkills = taskSkillIds.every((skId) => devSkillIds.includes(skId));
+                  {(() => {
+                    const hasTaskSkills = taskSkillIds.length > 0;
+                    const isAssigneeDisabled = isRowUpdating || (!hasTaskSkills && task.assigned_developer_id === null);
 
-                        return (
-                          <MenuItem key={dev.id} value={dev.id}>
-                            <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                              <Typography variant="body2" fontWeight={hasAllSkills ? 600 : 400}>
-                                {dev.name}
-                              </Typography>
-                              {!hasAllSkills && (
-                                <Tooltip title="Lacks required skills for this task">
-                                  <WarningAmberIcon fontSize="small" color="warning" sx={{ ml: 1 }} />
-                                </Tooltip>
-                              )}
-                            </Box>
-                          </MenuItem>
-                        );
-                      })}
-                    </Select>
-                  </FormControl>
+                    return (
+                      <Tooltip
+                        title={
+                          !hasTaskSkills
+                            ? 'Please assign skills to this task before assigning a developer'
+                            : ''
+                        }
+                        arrow
+                        placement="top"
+                      >
+                        <Box component="span" sx={{ display: 'block', width: '100%' }}>
+                          <FormControl size="small" fullWidth disabled={isAssigneeDisabled}>
+                            <Select
+                              displayEmpty
+                              value={task.assigned_developer_id ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  if (task.assigned_developer_id !== null) {
+                                    onRequestAssigneeChange(task, null, 'Unassigned');
+                                  }
+                                } else {
+                                  if (!hasTaskSkills) return;
+                                  const devId = Number(val);
+                                  if (devId && devId !== task.assigned_developer_id) {
+                                    const targetDev = developers.find((d) => d.id === devId);
+                                    const devSkillIds = targetDev?.skills.map((s) => s.id) || [];
+                                    const hasAll = taskSkillIds.every((skId) => devSkillIds.includes(skId));
+                                    if (!hasAll) return;
+                                    const devName = targetDev ? targetDev.name : `Developer #${devId}`;
+                                    onRequestAssigneeChange(task, devId, devName);
+                                  }
+                                }
+                              }}
+                              renderValue={(selected) => {
+                                if (!selected) {
+                                  return (
+                                    <Box display="flex" alignItems="center" gap={1} color="#94a3b8">
+                                      <PersonOutlineIcon fontSize="small" />
+                                      <em>Unassigned</em>
+                                    </Box>
+                                  );
+                                }
+                                const dev = developers.find((d) => d.id === Number(selected));
+                                return (
+                                  <Box display="flex" alignItems="center" gap={1} fontWeight={600} color="#0f172a">
+                                    <PersonOutlineIcon fontSize="small" color="primary" />
+                                    {dev ? dev.name : task.assigned_developer?.name || `Dev #${selected}`}
+                                  </Box>
+                                );
+                              }}
+                              sx={{
+                                borderRadius: 2,
+                                fontSize: '0.875rem',
+                                bgcolor: !hasTaskSkills && !task.assigned_developer_id ? '#f8fafc' : '#ffffff',
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                  borderColor: '#cbd5e1',
+                                },
+                              }}
+                            >
+                              <MenuItem value="">
+                                <Box display="flex" alignItems="center" gap={1} color="#64748b">
+                                  <PersonOutlineIcon fontSize="small" />
+                                  <em>Unassigned</em>
+                                </Box>
+                              </MenuItem>
+                              {developers.map((dev) => {
+                                const devSkillIds = dev.skills.map((s) => s.id);
+                                const hasAllSkills = hasTaskSkills && taskSkillIds.every((skId) => devSkillIds.includes(skId));
+
+                                return (
+                                  <MenuItem
+                                    key={dev.id}
+                                    value={dev.id}
+                                    disabled={!hasTaskSkills || !hasAllSkills}
+                                  >
+                                    <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                                      <Typography variant="body2" fontWeight={hasAllSkills ? 600 : 400}>
+                                        {dev.name}
+                                      </Typography>
+                                      {!hasTaskSkills ? (
+                                        <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic', ml: 1 }}>
+                                          No skills defined
+                                        </Typography>
+                                      ) : !hasAllSkills ? (
+                                        <Tooltip title="Cannot select: developer lacks required skills">
+                                          <WarningAmberIcon fontSize="small" color="warning" sx={{ ml: 1 }} />
+                                        </Tooltip>
+                                      ) : null}
+                                    </Box>
+                                  </MenuItem>
+                                );
+                              })}
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      </Tooltip>
+                    );
+                  })()}
                 </TableCell>
               </TableRow>
             );
