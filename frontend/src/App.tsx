@@ -175,6 +175,10 @@ export const App: React.FC = () => {
   };
 
   const handleRequestAssigneeChange = (task: Task, developerId: number | null, developerName: string) => {
+    if (developerId !== null && (!task.skills || task.skills.length === 0)) {
+      showSnackbar('Cannot assign developer: Please assign required skills to this task first.', 'warning');
+      return;
+    }
     setPendingAction({
       type: 'assignee',
       taskId: task.id,
