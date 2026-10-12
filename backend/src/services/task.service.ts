@@ -6,7 +6,7 @@ import { TaskRepository } from '../models/task.repository';
 import { DeveloperRepository } from '../models/developer.repository';
 import { SkillRepository } from '../models/skill.repository';
 import { LLMService } from './llm.service';
-import { TaskWithDetails, CreateTaskDTO, CustomError } from '../types';
+import { Skill, TaskWithDetails, CreateTaskDTO, CustomError } from '../types';
 
 export class TaskService {
   constructor(
