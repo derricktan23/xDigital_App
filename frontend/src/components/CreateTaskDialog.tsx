@@ -166,6 +166,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       }}
     >
       <DialogTitle
+        component="div"
         sx={{
           m: 0,
           p: 2.5,
@@ -175,7 +176,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           borderBottom: '1px solid #f1f5f9',
         }}
       >
-        <Typography variant="h6" fontWeight={700} color="#0f172a">
+        <Typography component="span" variant="h6" fontWeight={700} color="#0f172a">
           Create Task(s)
         </Typography>
         <IconButton onClick={handleClose} size="small" sx={{ color: '#64748b' }}>

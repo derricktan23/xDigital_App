@@ -49,7 +49,7 @@ export interface CreateTaskDTO {
 }
 
 export interface AssignTaskDTO {
-  developer_id: number;
+  developer_id: number | null;
 }
 
 export interface UpdateStatusDTO {
