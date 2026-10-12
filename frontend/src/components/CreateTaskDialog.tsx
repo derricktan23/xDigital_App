@@ -79,15 +79,47 @@ function updateNodeSkillsInTree(node: TaskFormNode, targetId: string, skills: nu
   };
 }
 
-function validateTree(node: TaskFormNode): string | null {
-  if (!node.title.trim()) {
-    return node.isRoot ? 'Task title is required' : 'Subtask title is required';
+function validateTree(root: TaskFormNode): string | null {
+  const titlesSeen = new Map<string, string>(); // lowercased title -> 'root' | 'subtask'
+
+  function checkNode(node: TaskFormNode, isRoot: boolean): string | null {
+    const trimmed = node.title.trim();
+    const label = isRoot ? 'Task' : 'Subtask';
+
+    // 1. Required check
+    if (!trimmed) {
+      return `${label} title is required`;
+    }
+
+    // 2. Minimum length check
+    if (trimmed.length < 3) {
+      return `${label} title must be at least 3 characters`;
+    }
+
+    // 3. Maximum length check
+    if (trimmed.length > 100) {
+      return `${label} title cannot exceed 100 characters`;
+    }
+
+    // 4. Duplicate title check (task and subtask titles cannot be the same)
+    const normalized = trimmed.toLowerCase();
+    if (titlesSeen.has(normalized)) {
+      const existingType = titlesSeen.get(normalized);
+      if (existingType === 'root' || isRoot) {
+        return 'Task and subtask title cannot be the same';
+      }
+      return `Duplicate subtask title: "${trimmed}"`;
+    }
+    titlesSeen.set(normalized, isRoot ? 'root' : 'subtask');
+
+    for (const child of node.subtasks) {
+      const err = checkNode(child, false);
+      if (err) return err;
+    }
+    return null;
   }
-  for (const child of node.subtasks) {
-    const err = validateTree(child);
-    if (err) return err;
-  }
-  return null;
+
+  return checkNode(root, true);
 }
 
 function treeToPayload(node: TaskFormNode): CreateTaskPayload {
@@ -126,10 +158,12 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
   const handleAddSubtask = (parentId: string) => {
     setRootNode((prev) => addSubtaskToTree(prev, parentId));
+    if (errorMessage) setErrorMessage('');
   };
 
   const handleRemoveSubtask = (nodeId: string) => {
     setRootNode((prev) => removeSubtaskFromTree(prev, nodeId));
+    if (errorMessage) setErrorMessage('');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -145,12 +179,26 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       const payload = treeToPayload(rootNode);
       await onSubmit(payload);
       handleClose();
-    } catch (err) {
-      // Error is caught and surfaced in App notification toast
+    } catch (err: any) {
+      const serverError =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to create task. Please check server connection.';
+      setErrorMessage(serverError);
     } finally {
       setLoading(false);
     }
   };
+
+  const validationError = validateTree(rootNode);
+  const isFormInvalid = Boolean(validationError);
+
+  // Surface duplicate title and length errors in real-time so user knows why Save is disabled
+  const isRealtimeValidationError =
+    validationError &&
+    !validationError.endsWith('is required');
+
+  const activeAlertMessage = errorMessage || (isRealtimeValidationError ? validationError : '');
 
   return (
     <Dialog
@@ -186,9 +234,9 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
       <form onSubmit={handleSave}>
         <DialogContent sx={{ p: 3, maxHeight: '70vh', overflowY: 'auto' }}>
-          {errorMessage && (
+          {activeAlertMessage && (
             <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
-              {errorMessage}
+              {activeAlertMessage}
             </Alert>
           )}
 
@@ -223,7 +271,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             type="submit"
             variant="contained"
             disableElevation
-            disabled={loading}
+            disabled={loading || isFormInvalid}
             sx={{
               bgcolor: '#2563eb',
               color: '#ffffff',
@@ -234,6 +282,10 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               borderRadius: 2,
               '&:hover': {
                 bgcolor: '#1d4ed8',
+              },
+              '&.Mui-disabled': {
+                bgcolor: '#e2e8f0',
+                color: '#94a3b8',
               },
             }}
           >

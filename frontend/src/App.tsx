@@ -165,6 +165,16 @@ export const App: React.FC = () => {
   };
 
   const handleRequestStatusChange = (task: Task, newStatus: TaskStatus) => {
+    if (newStatus !== 'To-do') {
+      if (!task.skills || task.skills.length === 0) {
+        showSnackbar(`Cannot change status to "${newStatus}": Please assign required skills first.`, 'warning');
+        return;
+      }
+      if (!task.assigned_developer_id) {
+        showSnackbar(`Cannot change status to "${newStatus}": Please assign a developer first.`, 'warning');
+        return;
+      }
+    }
     setPendingAction({
       type: 'status',
       taskId: task.id,

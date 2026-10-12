@@ -21,9 +21,18 @@ export class TaskService {
       throw new CustomError('Task title is required', 400);
     }
 
+    const trimmedTitle = dto.title.trim();
+    if (trimmedTitle.length < 3) {
+      throw new CustomError('Task title must be at least 3 characters', 400);
+    }
+
+    if (trimmedTitle.length > 100) {
+      throw new CustomError('Task title cannot exceed 100 characters', 400);
+    }
+
     const status = dto.status || 'To-do';
     const parentId = dto.parent_task_id ?? parentTaskId;
-    const task = await this.taskRepository.create(dto.title, status, parentId);
+    const task = await this.taskRepository.create(trimmedTitle, status, parentId);
 
     // If user provided task_skills, attach them directly.
     if (dto.task_skills && dto.task_skills.length > 0) {
@@ -31,7 +40,22 @@ export class TaskService {
     }
 
     if (dto.subtasks && dto.subtasks.length > 0) {
+      const parentTitleNorm = trimmedTitle.toLowerCase();
+      const seenSubtasks = new Set<string>();
+
       for (const subtaskDto of dto.subtasks) {
+        if (!subtaskDto.title || subtaskDto.title.trim() === '') {
+          throw new CustomError('Subtask title is required', 400);
+        }
+        const subtaskTitleNorm = subtaskDto.title.trim().toLowerCase();
+        if (subtaskTitleNorm === parentTitleNorm) {
+          throw new CustomError('Task and subtask title cannot be the same', 400);
+        }
+        if (seenSubtasks.has(subtaskTitleNorm)) {
+          throw new CustomError(`Duplicate subtask title: "${subtaskDto.title.trim()}"`, 400);
+        }
+        seenSubtasks.add(subtaskTitleNorm);
+
         await this.createTask(subtaskDto, task.id);
       }
     }
@@ -113,15 +137,26 @@ export class TaskService {
       throw new CustomError('Status is required', 400);
     }
 
+    // Business Rule: A task or subtask cannot be moved to "In Progress" or "Done" without required skills and an assigned developer
+    if (status !== 'To-do') {
+      const skills = await this.taskRepository.getTaskSkills(taskId);
+      if (skills.length === 0) {
+        throw new CustomError(`Cannot change status to "${status}": Please assign required skills first`, 400);
+      }
+      if (!task.assigned_developer_id) {
+        throw new CustomError(`Cannot change status to "${status}": Please assign a developer first`, 400);
+      }
+    }
+
     // Business Rule 4.2: A task can only have its status changed to "Done" if all its subtasks are "Done"
     if (status === 'Done') {
       const incompleteSubtasks = await this.taskRepository.getIncompleteSubtasks(taskId);
       if (incompleteSubtasks.length > 0) {
         const incompleteList = incompleteSubtasks
-          .map((sub) => `"${sub.title}" (${sub.status})`)
+          .map((sub) => `"${sub.title}"`)
           .join(', ');
         throw new CustomError(
-          `Cannot mark task as Done: all subtasks must be Done first. Incomplete subtask(s): ${incompleteList}`,
+          `Please complete all subtasks first: ${incompleteList}`,
           400
         );
       }
