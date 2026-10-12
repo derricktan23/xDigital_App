@@ -18,6 +18,7 @@ import {
   OutlinedInput,
   Checkbox,
   ListItemText,
+  Button,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -26,6 +27,8 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CloseIcon from '@mui/icons-material/Close';
 import { Task, Developer, Skill, TaskStatus } from '../types';
 import { SkillChip } from './SkillChip';
 
@@ -35,9 +38,13 @@ interface TaskTableProps {
   availableSkills: Skill[];
   loading: boolean;
   updatingTaskId: number | null;
+  analyzingTaskIds?: Set<number>;
+  aiRecommendations?: Record<number, Skill[]>;
   onRequestStatusChange: (task: Task, newStatus: TaskStatus) => void;
   onRequestAssigneeChange: (task: Task, developerId: number | null, developerName: string) => void;
   onRequestSkillsChange: (task: Task, newSkillIds: number[]) => void;
+  onApplyRecommendation?: (taskId: number, skills: Skill[]) => void;
+  onDismissRecommendation?: (taskId: number) => void;
 }
 
 /**
@@ -88,9 +95,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   availableSkills,
   loading,
   updatingTaskId,
+  analyzingTaskIds,
+  aiRecommendations,
   onRequestStatusChange,
   onRequestAssigneeChange,
   onRequestSkillsChange,
+  onApplyRecommendation,
+  onDismissRecommendation,
 }) => {
   // Collapsed task IDs (starts empty so all rows are expanded by default)
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<number>>(new Set());
@@ -174,6 +185,25 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return false;
   };
 
+  // Map main tasks (root tasks without a parent) to sequential display IDs: 1, 2, 3, 4, ...
+  // Subtasks do not consume main task IDs
+  const mainTaskIdToDisplayNum = new Map<number, number>();
+  const rootTasksSorted = tasks
+    .filter((t) => !t.parent_task_id)
+    .sort((a, b) => a.id - b.id);
+  rootTasksSorted.forEach((t, index) => {
+    mainTaskIdToDisplayNum.set(t.id, index + 1);
+  });
+
+  // Helper to find the main/root ancestor display number for any task or subtask
+  const getMainTaskDisplayNum = (task: Task): number | undefined => {
+    let curr: Task | undefined = task;
+    while (curr && curr.parent_task_id) {
+      curr = taskMap.get(curr.parent_task_id);
+    }
+    return curr ? mainTaskIdToDisplayNum.get(curr.id) : undefined;
+  };
+
   const orderedTasks = getHierarchicalTasks(tasks);
 
   return (
@@ -233,7 +263,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   bgcolor: isRowUpdating ? '#f8fafc' : isSubtask ? '#fcfdfd' : 'inherit',
                 }}
               >
-                {/* 1. ID Column (Only main tasks are numbered) */}
+                {/* 1. ID Column (Only main tasks are numbered sequentially; subtasks do not consume IDs) */}
                 <TableCell
                   sx={{
                     color: '#0f172a',
@@ -243,7 +273,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     pt: isSubtask ? 2.5 : 2,
                   }}
                 >
-                  {!isSubtask ? `#${task.id}` : null}
+                  {!isSubtask ? `#${mainTaskIdToDisplayNum.get(task.id) || task.id}` : null}
                 </TableCell>
 
                 {/* 2. Task Title Column (with expand/collapse controls) */}
@@ -338,7 +368,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               display: 'inline-block',
                             }}
                           >
-                            Subtask of #{task.parent_task_id}
+                            Subtask of #{getMainTaskDisplayNum(task) || task.parent_task_id}
                           </Typography>
                         </Box>
                       </Box>
@@ -402,62 +432,155 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   )}
                 </TableCell>
 
-                {/* 3. Skills Column (Interactive Multi-Select for tasks & subtasks) */}
-                <TableCell sx={{ verticalAlign: isSubtask ? 'top' : 'middle', pt: isSubtask ? 2 : 2 }}>
-                  <FormControl size="small" fullWidth disabled={isRowUpdating}>
-                    <Select
-                      multiple
-                      displayEmpty
-                      value={task.skills.map((s) => s.id)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const newSkillIds =
-                          typeof val === 'string'
-                            ? val.split(',').map(Number)
-                            : (val as number[]);
-                        onRequestSkillsChange(task, newSkillIds);
-                      }}
-                      input={<OutlinedInput size="small" />}
-                      renderValue={(selected) => {
-                        const sel = selected as number[];
-                        if (!sel || sel.length === 0) {
-                          return (
-                            <Box display="flex" alignItems="center" gap={0.5} color="#94a3b8">
-                              <Typography variant="body2" sx={{ fontStyle: 'italic', fontSize: '0.85rem' }}>
-                                + Add Skills
-                              </Typography>
-                            </Box>
-                          );
-                        }
-                        return (
-                          <Box display="flex" flexWrap="wrap" gap={0.5}>
-                            {sel.map((skillId) => {
-                              const skill = (availableSkills || []).find((s) => s.id === skillId);
-                              return skill ? <SkillChip key={skill.id} name={skill.name} /> : null;
-                            })}
+                {/* 3. Skills Column (Interactive Multi-Select with Separate Enterprise AI Recommendation UI) */}
+                <TableCell sx={{ verticalAlign: isSubtask ? 'top' : 'middle', pt: isSubtask ? 2 : 2, minWidth: 230 }}>
+                  <Box display="flex" flexDirection="column" gap={0.8}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <FormControl size="small" fullWidth disabled={isRowUpdating}>
+                        <Select
+                          multiple
+                          displayEmpty
+                          value={task.skills.map((s) => s.id)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const rawList = typeof val === 'string' ? val.split(',') : (val as (number | string)[]);
+                            if (rawList.includes('__AI_RECOMMEND__')) {
+                              onRequestAiRecommend?.(task);
+                              return;
+                            }
+                            const newSkillIds = rawList
+                              .map(Number)
+                              .filter((id) => !isNaN(id));
+                            onRequestSkillsChange(task, newSkillIds);
+                          }}
+                          input={<OutlinedInput size="small" />}
+                          renderValue={(selected) => {
+                            const sel = (selected as number[]).filter((id) => typeof id === 'number' && !isNaN(id));
+                            if (!sel || sel.length === 0) {
+                              return (
+                                <Box display="flex" alignItems="center" gap={0.5} color="#94a3b8">
+                                  <Typography variant="body2" sx={{ fontStyle: 'italic', fontSize: '0.82rem' }}>
+                                    None specified
+                                  </Typography>
+                                </Box>
+                              );
+                            }
+                            return (
+                              <Box display="flex" flexWrap="wrap" gap={0.5}>
+                                {sel.map((skillId) => {
+                                  const skill = (availableSkills || []).find((s) => s.id === skillId);
+                                  return skill ? <SkillChip key={skill.id} name={skill.name} /> : null;
+                                })}
+                              </Box>
+                            );
+                          }}
+                          sx={{
+                            borderRadius: 2,
+                            fontSize: '0.875rem',
+                            bgcolor: '#ffffff',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#cbd5e1',
+                            },
+                          }}
+                        >
+                          {(availableSkills || []).map((skill) => (
+                            <MenuItem key={skill.id} value={skill.id}>
+                              <Checkbox
+                                checked={task.skills.some((s) => s.id === skill.id)}
+                                size="small"
+                              />
+                              <ListItemText primary={skill.name} />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
+
+                    {/* SEPARATE ENTERPRISE UI FOR AUTOMATIC AI RECOMMENDATIONS */}
+                    {/* 1. If currently analyzing with AI */}
+                    {analyzingTaskIds?.has(task.id) && (
+                      <Box
+                        sx={{
+                          p: 0.8,
+                          borderRadius: 1.5,
+                          bgcolor: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.8,
+                          color: '#1d4ed8',
+                        }}
+                      >
+                        <CircularProgress size={12} color="inherit" />
+                        <Typography variant="caption" fontWeight={600} fontSize="0.72rem">
+                          AI analyzing task title...
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* 2. If recommendation is available and task has no confirmed skills */}
+                    {aiRecommendations?.[task.id] &&
+                      aiRecommendations[task.id].length > 0 &&
+                      !analyzingTaskIds?.has(task.id) && (
+                        <Box
+                          sx={{
+                            p: 0.8,
+                            borderRadius: 1.5,
+                            bgcolor: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 0.8,
+                          }}
+                        >
+                          <Box display="flex" alignItems="center" gap={0.6} flexWrap="wrap">
+                            <AutoAwesomeIcon sx={{ fontSize: 13, color: '#16a34a' }} />
+                            <Typography variant="caption" sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#15803d' }}>
+                              AI Suggestion:
+                            </Typography>
+                            {aiRecommendations[task.id].map((sk) => (
+                              <SkillChip key={sk.id} name={sk.name} />
+                            ))}
                           </Box>
-                        );
-                      }}
-                      sx={{
-                        borderRadius: 2,
-                        fontSize: '0.875rem',
-                        bgcolor: '#ffffff',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#cbd5e1',
-                        },
-                      }}
-                    >
-                      {(availableSkills || []).map((skill) => (
-                        <MenuItem key={skill.id} value={skill.id}>
-                          <Checkbox
-                            checked={task.skills.some((s) => s.id === skill.id)}
-                            size="small"
-                          />
-                          <ListItemText primary={skill.name} />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+
+                          <Box display="flex" alignItems="center" gap={0.4}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disabled={isRowUpdating}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onApplyRecommendation?.(task.id, aiRecommendations[task.id]);
+                              }}
+                              sx={{
+                                minWidth: 'auto',
+                                px: 1,
+                                py: 0.2,
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                bgcolor: '#16a34a',
+                                '&:hover': { bgcolor: '#15803d' },
+                                borderRadius: 1,
+                              }}
+                            >
+                              Apply
+                            </Button>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDismissRecommendation?.(task.id);
+                              }}
+                              sx={{ p: 0.2, color: '#94a3b8' }}
+                            >
+                              <CloseIcon sx={{ fontSize: 13 }} />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      )}
+                  </Box>
                 </TableCell>
 
                 {/* 4. Status Dropdown Column */}

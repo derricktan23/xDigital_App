@@ -105,4 +105,18 @@ export class TaskController {
       next(error);
     }
   };
+
+  recommendSkillsForTask = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      if (isNaN(taskId)) {
+        res.status(400).json({ error: 'Invalid task ID' });
+        return;
+      }
+      const result = await this.taskService.recommendSkillsForTask(taskId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
 }
