@@ -179,6 +179,15 @@ export const App: React.FC = () => {
       showSnackbar('Cannot assign developer: Please assign required skills to this task first.', 'warning');
       return;
     }
+    if (developerId !== null) {
+      const targetDev = developers.find((d) => d.id === developerId);
+      const devSkillIds = targetDev?.skills.map((s) => s.id) || [];
+      const hasAllSkills = task.skills.every((sk) => devSkillIds.includes(sk.id));
+      if (!hasAllSkills) {
+        showSnackbar(`Cannot assign: ${developerName} lacks required skills for this task.`, 'warning');
+        return;
+      }
+    }
     setPendingAction({
       type: 'assignee',
       taskId: task.id,

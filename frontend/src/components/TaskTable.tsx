@@ -655,6 +655,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   const devId = Number(val);
                                   if (devId && devId !== task.assigned_developer_id) {
                                     const targetDev = developers.find((d) => d.id === devId);
+                                    const devSkillIds = targetDev?.skills.map((s) => s.id) || [];
+                                    const hasAll = taskSkillIds.every((skId) => devSkillIds.includes(skId));
+                                    if (!hasAll) return;
                                     const devName = targetDev ? targetDev.name : `Developer #${devId}`;
                                     onRequestAssigneeChange(task, devId, devName);
                                   }
@@ -700,7 +703,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   <MenuItem
                                     key={dev.id}
                                     value={dev.id}
-                                    disabled={!hasTaskSkills}
+                                    disabled={!hasTaskSkills || !hasAllSkills}
                                   >
                                     <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
                                       <Typography variant="body2" fontWeight={hasAllSkills ? 600 : 400}>
@@ -711,7 +714,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                           No skills defined
                                         </Typography>
                                       ) : !hasAllSkills ? (
-                                        <Tooltip title="Lacks required skills for this task">
+                                        <Tooltip title="Cannot select: developer lacks required skills">
                                           <WarningAmberIcon fontSize="small" color="warning" sx={{ ml: 1 }} />
                                         </Tooltip>
                                       ) : null}
