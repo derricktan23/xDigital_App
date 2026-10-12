@@ -313,6 +313,7 @@ export const App: React.FC = () => {
           open={createDialogOpen}
           onClose={() => setCreateDialogOpen(false)}
           availableSkills={skills}
+          existingTasks={tasks}
           onSubmit={handleCreateTask}
         />
 
