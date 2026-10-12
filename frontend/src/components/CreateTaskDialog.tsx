@@ -12,13 +12,14 @@ import {
   Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { Skill, CreateTaskPayload } from '../types';
+import { Task, Skill, CreateTaskPayload } from '../types';
 import { TaskNodeItem, TaskFormNode } from './TaskNodeItem';
 
 interface CreateTaskDialogProps {
   open: boolean;
   onClose: () => void;
   availableSkills: Skill[];
+  existingTasks?: Task[];
   onSubmit: (payload: CreateTaskPayload) => Promise<void>;
 }
 
@@ -79,8 +80,15 @@ function updateNodeSkillsInTree(node: TaskFormNode, targetId: string, skills: nu
   };
 }
 
-function validateTree(root: TaskFormNode): string | null {
+function validateTree(root: TaskFormNode, existingTasks: Task[] = []): string | null {
   const titlesSeen = new Map<string, string>(); // lowercased title -> 'root' | 'subtask'
+
+  // Pre-populate existing main task titles (normalized)
+  const existingMainTitles = new Set(
+    (existingTasks || [])
+      .filter((t) => !t.parent_task_id)
+      .map((t) => (t.title || '').trim().toLowerCase())
+  );
 
   function checkNode(node: TaskFormNode, isRoot: boolean): string | null {
     const trimmed = node.title.trim();
@@ -101,8 +109,14 @@ function validateTree(root: TaskFormNode): string | null {
       return `${label} title cannot exceed 100 characters`;
     }
 
-    // 4. Duplicate title check (task and subtask titles cannot be the same)
     const normalized = trimmed.toLowerCase();
+
+    // 4. Duplicate title check against existing main tasks
+    if (isRoot && existingMainTitles.has(normalized)) {
+      return `Duplicate task title: "${trimmed}"`;
+    }
+
+    // 5. Duplicate title check within the form tree (task and subtask titles cannot be the same)
     if (titlesSeen.has(normalized)) {
       const existingType = titlesSeen.get(normalized);
       if (existingType === 'root' || isRoot) {
@@ -135,6 +149,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onClose,
   availableSkills,
+  existingTasks = [],
   onSubmit,
 }) => {
   const [rootNode, setRootNode] = useState<TaskFormNode>(createInitialRootNode);
@@ -168,7 +183,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationError = validateTree(rootNode);
+    const validationError = validateTree(rootNode, existingTasks);
     if (validationError) {
       setErrorMessage(validationError);
       return;
@@ -190,7 +205,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     }
   };
 
-  const validationError = validateTree(rootNode);
+  const validationError = validateTree(rootNode, existingTasks);
   const isFormInvalid = Boolean(validationError);
 
   // Surface duplicate title and length errors in real-time so user knows why Save is disabled
@@ -199,6 +214,11 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     !validationError.endsWith('is required');
 
   const activeAlertMessage = errorMessage || (isRealtimeValidationError ? validationError : '');
+  const isRootError = Boolean(
+    validationError &&
+    (validationError.startsWith('Task') || validationError.startsWith('Duplicate task'))
+  );
+  const rootNodeError = isRealtimeValidationError && isRootError ? validationError : undefined;
 
   return (
     <Dialog
@@ -248,6 +268,7 @@ export const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               onUpdateSkills={handleUpdateSkills}
               onAddSubtask={handleAddSubtask}
               onRemoveSubtask={handleRemoveSubtask}
+              error={rootNodeError}
             />
           </Box>
         </DialogContent>
