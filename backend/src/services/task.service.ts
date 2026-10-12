@@ -5,14 +5,15 @@
 import { TaskRepository } from '../models/task.repository';
 import { DeveloperRepository } from '../models/developer.repository';
 import { SkillRepository } from '../models/skill.repository';
-import { TaskWithDetails, CreateTaskDTO, CustomError } from '../types';
+import { LLMService } from './llm.service';
+import { Skill, TaskWithDetails, CreateTaskDTO, CustomError } from '../types';
 
 export class TaskService {
   constructor(
     private taskRepository: TaskRepository = new TaskRepository(),
     private developerRepository: DeveloperRepository = new DeveloperRepository(),
     private skillRepository: SkillRepository = new SkillRepository()
-  ) {}
+  ) { }
 
   async createTask(dto: CreateTaskDTO, parentTaskId: number | null = null): Promise<TaskWithDetails> {
     if (!dto.title || dto.title.trim() === '') {
