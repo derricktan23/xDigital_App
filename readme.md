@@ -188,11 +188,9 @@ DB_PORT=5432
 # Backend API Port
 PORT=5001
 
-# Optional: Google Gemini AI Key
+# Google Gemini AI Key
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
-
-> 💡 **Good to know**: The Gemini API key is completely optional! If you leave it blank, the app will smoothly use its built-in keyword matcher instead.
 
 ---
 
